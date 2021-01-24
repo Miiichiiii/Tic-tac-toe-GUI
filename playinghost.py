@@ -1,4 +1,5 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
+from Confirmation_dialog import Confirmation
 
 
 class Dialoghoster(QtWidgets.QDialog):
@@ -16,6 +17,7 @@ class Dialoghoster(QtWidgets.QDialog):
         self.l02 = QtWidgets.QLabel(self.Dialog)
         self.l12 = QtWidgets.QLabel(self.Dialog)
         self.l22 = QtWidgets.QLabel(self.Dialog)
+        self.newGame = QtWidgets.QPushButton(self.Dialog)
         self.label_drawed = {self.l00: False, self.l10: False, self.l20: False, self.l01: False, self.l11: False,
                              self.l21: False, self.l02: False, self.l12: False, self.l22: False}
         self.verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
@@ -34,8 +36,8 @@ class Dialoghoster(QtWidgets.QDialog):
 
     def setupUi(self):
         self.Dialog.setObjectName("Dialog")
-        self.Dialog.resize(740, 367)
-        self.Outputlabel.setGeometry(QtCore.QRect(10, 340, 721, 16))
+        self.Dialog.resize(740, 395)
+        self.Outputlabel.setGeometry(QtCore.QRect(13, 370, 721, 16))
         self.Outputlabel.setObjectName("Outputlabel")
         self.verticalLayoutWidget.setGeometry(QtCore.QRect(340, 10, 391, 321))
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
@@ -68,6 +70,10 @@ class Dialoghoster(QtWidgets.QDialog):
         self.l22.setObjectName("label_8")
         self.l02.setGeometry(QtCore.QRect(10, 230, 100, 100))
         self.l02.setObjectName("label_9")
+        self.newGame.setGeometry(QtCore.QRect(10, 340, 75, 23))
+        self.newGame.setObjectName("NewGamebttn")
+        self.newGame.setText("New Game")
+        self.newGame.clicked.connect(self.newGameaction)
 
         for i in self.label_drawed.keys():
             i.installEventFilter(self)
@@ -76,7 +82,26 @@ class Dialoghoster(QtWidgets.QDialog):
 
         self.Dialog.setWindowTitle("Tic tac toe")
         self.Multiplayerlabel.setText("Multiplayer")
+
         QtCore.QMetaObject.connectSlotsByName(self.Dialog)
+
+    @staticmethod
+    def await_confirmation(msg):
+        confirmation_box = Confirmation(msg)
+        if confirmation_box.Dialog.exec_():
+            return True
+        else:
+            return False
+
+    def is_game_finished(self):
+        pass  # TODO
+
+    def newGameaction(self):
+        if self.is_game_finished():
+            pass
+        else:
+            if self.await_confirmation("Are you sure you want to start a new Game - Old Game isn't completed"):
+                pass  # TODO
 
     @staticmethod
     def draw(obj: QtWidgets.QLabel, picture: QtGui.QPixmap):

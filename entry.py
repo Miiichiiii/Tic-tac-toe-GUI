@@ -1,57 +1,53 @@
-from queue import Empty, Queue
-from threading import Thread
 from PyQt5 import QtCore, QtWidgets
 import socket
-from playinghost import Dialoghoster
 from playing import Dialogplaying
+from playinghost import Dialoghoster
 from time import sleep
 
-class Client:
-    HEADER = 64
-    PORT = 8744
-    DISCONNECT_MSG = "#!DC#"
-    CONNECT_MSG = "#!CONNECTED#"
 
-    def __init__(self, conn, addr):
-        self.conn = conn
-        self.addr = addr
-        self.rv = Queue()
-        Thread(target=self.recv, daemon=True).start()
-        self.send(Client.CONNECT_MSG)
+class WorkerThread(QtCore.QThread):
+    signal = QtCore.pyqtSignal('PyQt_PyObject')
 
-    @classmethod
-    def _len_message(cls, msg):
-        message = msg.encode()
-        send_length = str(len(message)).encode()
-        send_length += b' ' * (cls.HEADER - len(send_length))
-        return send_length
+    def __init__(self, server):
+        QtCore.QThread.__init__(self)
+        self.server = server
 
-    def send(self, msg):
-        send_length = Client._len_message(msg)
-        self.conn.send(send_length)
-        self.conn.send(msg.encode())
+    def run(self):
+        self.server.listen(1)
+        conn, addr = self.server.accept()
+        self.signal.emit((conn, addr))
 
-    def recv(self):
-        while True:
+
+class WorkerThreadPlaying(QtCore.QThread):
+    signal = QtCore.pyqtSignal('PyQt_PyObject')
+
+    def __init__(self, ADDR, instance):
+        QtCore.QThread.__init__(self)
+        self.instance = instance
+        self.ADDR = ADDR
+
+    def run(self):
+        while self.instance.connecting:
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                msg_length = self.conn.recv(Client.HEADER).decode()
-                if msg_length:
-                    self.rv.put(self.conn.recv(int(msg_length)).decode())
-            except ConnectionError:
-                self.conn.close()
+                client.connect((self.ADDR[0], int(self.ADDR[1])))
+                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                client.connect(self.ADDR)
+            except ConnectionResetError:
+                self.instance.connectionstatusbttn.setText("Your opponent disconnected")
+                client.shutdown(socket.SHUT_RDWR)
+                client.close()
+            except ConnectionRefusedError:
+                self.instance.connectionstatusbttn.setText("Waiting for Connection")
+            except TimeoutError:
+                self.instance.connectionstatusbttn.setText("Timeout Error - maybe change IP")
+            except Exception:
+                self.instance.connectionstatusbttn.setText("Input should be in format: IP, Port")
                 return
-            except Exception as e:
-                print(f"Some not connection related Exception occured: {e}")
-
-    def rv_catch_timeout(self):
-        try:
-            return self.rv.get(block=True, timeout=5)
-        except Empty:
-            # ui.write("Code 408: Timeout-error", color="red") TODO
-            return False
-
-    def __repr__(self):
-        return "Client(conn, addr)"
+            else:
+                self.signal.emit(client)
+            finally:
+                sleep(0.5)
 
 
 class Entry(object):
@@ -121,6 +117,8 @@ class Entry(object):
 
     def on_host_click(self):
         self.connecting = False
+        # text = self.inputip.text() TODO
+        # self.inputip.clear()
         ADDR = (socket.gethostbyname(socket.gethostname()), 9312)
         if self.hosting:
             self.connectionstatusbttn.setText(f"Hoste Server auf {ADDR}")
@@ -130,14 +128,14 @@ class Entry(object):
         server.bind(ADDR)
         self.hosting = True
 
-        def inner():
-            server.listen(1)
-            conn, addr = server.accept()
-            dialog = Dialoghoster(conn, addr)
+        def start(client):
+            dialog = Dialoghoster(*client)
             dialog.Dialog.show()
             dialog.Dialog.exec_()
 
-        Thread(target=inner, daemon=True).start()
+        thread = WorkerThread(server)
+        thread.start()
+        thread.signal.connect(start)
 
     def on_connect_click(self):
         text = self.inputip.text()
@@ -150,36 +148,16 @@ class Entry(object):
             return
         self.connecting = True
         if len(ADDR) == 2:
-            def inner():
-                while self.connecting:
-                    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    try:
-                        client.connect((ADDR[0], int(ADDR[1])))
-                        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        client.connect(ADDR)
-                    except ConnectionResetError:
-                        self.connectionstatusbttn.setText("Your opponent disconnected")
-                        client.shutdown(socket.SHUT_RDWR)
-                        client.close()
-                    except ConnectionRefusedError:
-                        self.connectionstatusbttn.setText("Waiting for Connection")
-                    except TimeoutError:
-                        self.connectionstatusbttn.setText("Timeout Error - maybe change IP")
-                    except Exception:
-                        self.connectionstatusbttn.setText("Input should be in format: IP, Port")
-                        return
-                    else:
-                        self.run_connected(client)
-                    finally:
-                        sleep(0.5)
-
-            Thread(target=inner, daemon=True).start()
+            pass
+            thread = WorkerThreadPlaying(ADDR, self)
+            thread.start()
+            thread.signal.connect(self.run_connected)
         else:
             self.connectionstatusbttn.setText("Input should be in format: IP, Port")
 
-    def run_connected(self, client):
+    @staticmethod
+    def run_connected(client):
         dialog = Dialogplaying(client)
-        print("init ui")
         dialog.Dialog.show()
         dialog.Dialog.exec_()
 
