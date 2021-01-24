@@ -128,14 +128,14 @@ class Entry(object):
         server.bind(ADDR)
         self.hosting = True
 
-        def start(client):
-            dialog = Dialoghoster(*client)
-            dialog.Dialog.show()
-            dialog.Dialog.exec_()
+        self.thread = WorkerThread(server)
+        self.thread.start()
+        self.thread.signal.connect(self.run_host)
 
-        thread = WorkerThread(server)
-        thread.start()
-        thread.signal.connect(start)
+    def run_host(self, client):
+        dialog = Dialoghoster(*client)
+        dialog.Dialog.show()
+        dialog.Dialog.exec_()
 
     def on_connect_click(self):
         text = self.inputip.text()
@@ -149,9 +149,9 @@ class Entry(object):
         self.connecting = True
         if len(ADDR) == 2:
             pass
-            thread = WorkerThreadPlaying(ADDR, self)
-            thread.start()
-            thread.signal.connect(self.run_connected)
+            self.thread = WorkerThreadPlaying(ADDR, self)
+            self.thread.start()
+            self.thread.signal.connect(self.run_connected)
         else:
             self.connectionstatusbttn.setText("Input should be in format: IP, Port")
 
