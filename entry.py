@@ -23,8 +23,8 @@ class WorkerThreadPlaying(QtCore.QThread):
 
     def __init__(self, ADDR, instance):
         QtCore.QThread.__init__(self)
-        self.instance = instance
         self.ADDR = ADDR
+        self.instance = instance
 
     def run(self):
         while self.instance.connecting:
@@ -66,7 +66,7 @@ class Entry(object):
         self.newGame = QtWidgets.QPushButton(self.centralwidget)
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
 
-        self.hosting = False
+        self.hosting = [False, ["", 0]]
         self.connecting = False
 
         self.setupUi()
@@ -117,22 +117,33 @@ class Entry(object):
 
     def on_host_click(self):
         self.connecting = False
-        # text = self.inputip.text() TODO
-        # self.inputip.clear()
-        ADDR = (socket.gethostbyname(socket.gethostname()), 9312)
-        if self.hosting:
-            self.connectionstatusbttn.setText(f"Hoste Server auf {ADDR}")
+        text = self.inputip.text()
+        self.inputip.clear()
+        try:
+            ADDR = (socket.gethostbyname(socket.gethostname()), int(text))
+        except Exception as e:
+            self.connectionstatusbttn.setText(str(e))
+            return
+        if self.hosting[0]:
+            self.connectionstatusbttn.setText(f"Hoste Server auf {tuple(self.hosting[1])}")
             return
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connectionstatusbttn.setText(f"Hoste Server auf {ADDR}")
-        server.bind(ADDR)
-        self.hosting = True
 
-        self.thread = WorkerThread(server)
-        self.thread.start()
-        self.thread.signal.connect(self.run_host)
+        try:
+            server.bind(ADDR)
+        except Exception as e:
+            self.connectionstatusbttn.setText(str(e))
+            return
+        else:
+            self.connectionstatusbttn.setText(f"Hoste Server auf {ADDR}")
+            self.hosting[0] = True
 
-    def run_host(self, client):
+        self.threadHosting = WorkerThread(server)
+        self.threadHosting.start()
+        self.threadHosting.signal.connect(self.run_host)
+
+    @staticmethod
+    def run_host(client):
         dialog = Dialoghoster(*client)
         dialog.Dialog.show()
         dialog.Dialog.exec_()
@@ -149,9 +160,9 @@ class Entry(object):
         self.connecting = True
         if len(ADDR) == 2:
             pass
-            self.thread = WorkerThreadPlaying(ADDR, self)
-            self.thread.start()
-            self.thread.signal.connect(self.run_connected)
+            self.threadPlaying = WorkerThreadPlaying(ADDR, self)
+            self.threadPlaying.start()
+            self.threadPlaying.signal.connect(self.run_connected)
         else:
             self.connectionstatusbttn.setText("Input should be in format: IP, Port")
 
