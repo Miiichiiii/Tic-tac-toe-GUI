@@ -31,8 +31,6 @@ class WorkerThreadPlaying(QtCore.QThread):
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 client.connect((self.ADDR[0], int(self.ADDR[1])))
-                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                client.connect(self.ADDR)
             except ConnectionResetError:
                 self.instance.connectionstatusbttn.setText("Your opponent disconnected")
                 client.shutdown(socket.SHUT_RDWR)
@@ -45,6 +43,7 @@ class WorkerThreadPlaying(QtCore.QThread):
                 self.instance.connectionstatusbttn.setText("Input should be in format: IP, Port")
                 return
             else:
+                self.instance.connecting = False
                 self.signal.emit(client)
             finally:
                 sleep(0.5)

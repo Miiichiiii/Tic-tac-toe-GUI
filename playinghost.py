@@ -35,6 +35,8 @@ class Dialoghoster(QtWidgets.QDialog):
         self.playerTurn = True
         self.elements_dict_str = {"00": self.l00, "01": self.l01, "02": self.l02, "10": self.l10, "11": self.l11, "12": self.l12, "20": self.l20, "21": self.l21, "22": self.l22}
         self.elements_dict = {self.l00: "00", self.l01: "01", self.l02: "02", self.l10: "10", self.l11: "11", self.l12: "12", self.l20: "20", self.l21: "21", self.l22: "22"}
+        self.playerOpponent_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
+        self.playerOwn_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
 
         self.setupUi()
         self.reset()
@@ -110,9 +112,6 @@ class Dialoghoster(QtWidgets.QDialog):
         """Send messages to the Client"""
         send_length = Dialoghoster._len_message(msg)
         self.conn.send(send_length)
-        print(msg)
-        print(type(self.conn))
-        print(type(self.addr))
         self.conn.send(msg.encode())
 
     def recv(self):  # recv messages
@@ -123,13 +122,32 @@ class Dialoghoster(QtWidgets.QDialog):
                 if msg_length:
                     msg = self.conn.recv(int(msg_length)).decode()
                     if msg.startswith("!ACTIONDRAW-"):
+                        self.playerTurn = True
                         self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
+                        self.playerOpponent_drawings[msg.split("-")[1]] = True
+                        self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
+                        finished = self.is_game_finished()
+                        if finished[0]:
+                            if finished[1]:
+                                self.send("!FINISHED-LOST")
+                                self.won()
+                            else:
+                                self.send("!FINISHED-WON")
+                                self.lost()
+                    elif msg.startswith("!MSG-"):
+                        self.write(msg.split("-")[1])
             except ConnectionError:
                 self.conn.close()
                 self._dc()
                 return
             except Exception as e:
-                ui.write(f"Some not connection related Exception occured: {e}", color="red")
+                self.Outputlabel.setText(f"Some not connection related Exception occured: {str(e)}")
+
+    def won(self):
+        self.Outputlabel.setText("You have won")
+
+    def lost(self):
+        self.Outputlabel.setText("You have lost")
 
     @staticmethod
     def await_confirmation(msg):
@@ -140,14 +158,34 @@ class Dialoghoster(QtWidgets.QDialog):
             return False
 
     def is_game_finished(self):
-        pass  # TODO
+        d = {0: True, 1: False}
+        for e, u in enumerate([self.playerOwn_drawings, self.playerOpponent_drawings]):
+            if all([u["00"], u["10"], u["20"]]):
+                return True, d[e]
+            elif all([u["01"], u["11"], u["21"]]):
+                return True, d[e]
+            elif all([u["02"], u["12"], u["22"]]):
+                return True, d[e]
+            elif all([u["00"], u["01"], u["02"]]):
+                return True, d[e]
+            elif all([u["10"], u["11"], u["12"]]):
+                return True, d[e]
+            elif all([u["20"], u["21"], u["22"]]):
+                return True, d[e]
+            elif all([u["00"], u["11"], u["22"]]):
+                return True, d[e]
+            elif all([u["20"], u["11"], u["02"]]):
+                return True, d[e]
+        return False, False
 
     def newGameaction(self):
-        if self.is_game_finished():
-            pass
-        else:
+        if not self.is_game_finished()[0]:
             if self.await_confirmation("Are you sure you want to start a new Game - Old Game isn't completed"):
-                pass  # TODO
+                self.reset()
+                self.send("!NEWGAME")
+        else:
+            self.reset()
+            self.send("!NEWGAME")
 
     @staticmethod
     def draw(obj: QtWidgets.QLabel, picture: QtGui.QPixmap):
@@ -156,10 +194,14 @@ class Dialoghoster(QtWidgets.QDialog):
     def reset(self):
         for i in self.label_drawed.keys():
             i.setPixmap(self.blanked)
+            self.label_drawed[i] = False
+        self.playerOpponent_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
+        self.playerOwn_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
+        self.Outputlabel.setText("")
 
-    def write(self, text, color="black"):
+    def write(self, text):
         """Used to give output to the Chat"""
-        self.Chatplaintext.appendHtml(f'<p style="color:{color};">{text}</p>')
+        self.Chatplaintext.appendPlainText(f'{text}')
         self.Chatplaintext.verticalScrollBar().maximum()
         self.Chatplaintext.update()
 
@@ -167,13 +209,26 @@ class Dialoghoster(QtWidgets.QDialog):
         text = self.Inputlineedit.text()
         self.Inputlineedit.clear()
         self.write(">>> " + text)
+        self.send(f"!MSG-{text}")
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.MouseButtonDblClick:
             if self.playerTurn:
                 if not self.label_drawed[source]:
+                    # TODO game finished
                     self.draw(source, self.X)
+                    self.playerTurn = False
+                    self.label_drawed[source] = True
+                    self.playerOwn_drawings[self.elements_dict[source]] = True
                     self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
+                    finished = self.is_game_finished()
+                    if finished[0]:
+                        if finished[1]:
+                            self.send("!FINISHED-LOST")
+                            self.won()
+                        else:
+                            self.send("!FINISHED-WON")
+                            self.lost()
                 else:
                     self.Outputlabel.setText("You can't override an already printed field")
             else:
@@ -181,8 +236,8 @@ class Dialoghoster(QtWidgets.QDialog):
         return super(Dialoghoster, self).eventFilter(source, event)
 
 
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    ui = Dialoghoster()
-    sys.exit(app.exec_())
+# if __name__ == "__main__":
+#     import sys
+#     app = QtWidgets.QApplication(sys.argv)
+#     ui = Dialoghoster()
+#     sys.exit(app.exec_())

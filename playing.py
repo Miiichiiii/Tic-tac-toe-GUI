@@ -84,10 +84,11 @@ class Dialogplaying(QtWidgets.QDialog):
         self.Multiplayerlabel.setText("Multiplayer")
         QtCore.QMetaObject.connectSlotsByName(self.Dialog)
 
-    def _get_size(self, msg):
+    @classmethod
+    def _get_size(cls, msg):
         """Internal method to pad messages"""
         send_length = str(len(msg.encode())).encode()
-        send_length += b' ' * (Dialogplaying.HEADER - len(send_length))
+        send_length += b' ' * (cls.HEADER - len(send_length))
         return send_length
 
     def send(self, msg):
@@ -101,7 +102,24 @@ class Dialogplaying(QtWidgets.QDialog):
             if send_length:
                 msg = self.client.recv(int(send_length)).decode()
                 if msg.startswith("!ACTIONDRAW-"):
+                    self.playerTurn = True
                     self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
+                    self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
+                elif msg.startswith("!MSG-"):
+                    self.write(msg.split("-")[1])
+                elif msg.startswith("!FINISHED-"):
+                    if msg.split("-")[1] == "WON":
+                        self.won()
+                    else:
+                        self.lost()
+                elif msg.startswith("!NEWGAME"):
+                    self.reset()
+
+    def won(self):
+        self.Outputlabel.setText("You have won")
+
+    def lost(self):
+        self.Outputlabel.setText("You have lost")
 
     @staticmethod
     def draw(obj: QtWidgets.QLabel, picture: QtGui.QPixmap):
@@ -110,10 +128,12 @@ class Dialogplaying(QtWidgets.QDialog):
     def reset(self):
         for i in self.label_drawed.keys():
             i.setPixmap(self.blanked)
+            self.label_drawed[i] = False
+        self.Outputlabel.setText("")
 
-    def write(self, text, color="black"):
+    def write(self, text):
         """Used to give output to the Chat"""
-        self.Chatplaintext.appendHtml(f'<p style="color:{color};">{text}</p>')
+        self.Chatplaintext.appendPlainText(f'{text}')
         self.Chatplaintext.verticalScrollBar().maximum()
         self.Chatplaintext.update()
 
@@ -121,12 +141,15 @@ class Dialogplaying(QtWidgets.QDialog):
         text = self.Inputlineedit.text()
         self.Inputlineedit.clear()
         self.write(">>> " + text)
+        self.send(f"!MSG-{text}")
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.MouseButtonDblClick:
             if self.playerTurn:
                 if not self.label_drawed[source]:
                     self.draw(source, self.X)
+                    self.playerTurn = False
+                    self.label_drawed[source] = True
                     self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
                 else:
                     self.Outputlabel.setText("You can't override an already printed field")
