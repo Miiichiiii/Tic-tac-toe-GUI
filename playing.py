@@ -1,11 +1,13 @@
-
 from PyQt5 import QtCore, QtGui, QtWidgets
+from threading import Thread
 
 
 class Dialogplaying(QtWidgets.QDialog):
+    HEADER = 64
+
     def __init__(self, client=None):
         super().__init__()
-        self.connection = client
+        self.client = client
         self.Dialog = QtWidgets.QDialog()
         self.verticalLayoutWidget = QtWidgets.QWidget(self.Dialog)
         self.l00 = QtWidgets.QLabel(self.Dialog)
@@ -32,6 +34,9 @@ class Dialogplaying(QtWidgets.QDialog):
         self.setupUi()
         self.reset()
         self.Dialog.show()
+        self.elements_dict_str = {"00": self.l00, "01": self.l01, "02": self.l02, "10": self.l10, "11": self.l11, "12": self.l12, "20": self.l20, "21": self.l21, "22": self.l22}
+        self.elements_dict = {self.l00: "00", self.l01: "01", self.l02: "02", self.l10: "10", self.l11: "11", self.l12: "12", self.l20: "20", self.l21: "21", self.l22: "22"}
+        Thread(target=self.recv, daemon=True).start()
 
     def setupUi(self):
         self.Dialog.setObjectName("Dialog")
@@ -79,6 +84,25 @@ class Dialogplaying(QtWidgets.QDialog):
         self.Multiplayerlabel.setText("Multiplayer")
         QtCore.QMetaObject.connectSlotsByName(self.Dialog)
 
+    def _get_size(self, msg):
+        """Internal method to pad messages"""
+        send_length = str(len(msg.encode())).encode()
+        send_length += b' ' * (Dialogplaying.HEADER - len(send_length))
+        return send_length
+
+    def send(self, msg):
+        """Send messages back to the server"""
+        self.client.send(self._get_size(msg))
+        self.client.send(msg.encode())
+
+    def recv(self):
+        while True:
+            send_length = self.client.recv(Dialogplaying.HEADER).decode()
+            if send_length:
+                msg = self.client.recv(int(send_length)).decode()
+                if msg.startswith("!ACTIONDRAW-"):
+                    self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
+
     @staticmethod
     def draw(obj: QtWidgets.QLabel, picture: QtGui.QPixmap):
         obj.setPixmap(picture)
@@ -94,7 +118,6 @@ class Dialogplaying(QtWidgets.QDialog):
         self.Chatplaintext.update()
 
     def lineeditpressed(self):
-        print("moin ich bins")
         text = self.Inputlineedit.text()
         self.Inputlineedit.clear()
         self.write(">>> " + text)
@@ -104,6 +127,7 @@ class Dialogplaying(QtWidgets.QDialog):
             if self.playerTurn:
                 if not self.label_drawed[source]:
                     self.draw(source, self.X)
+                    self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
                 else:
                     self.Outputlabel.setText("You can't override an already printed field")
             else:

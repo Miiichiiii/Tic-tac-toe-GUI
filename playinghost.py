@@ -1,11 +1,15 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from Confirmation_dialog import Confirmation
-
+from threading import Thread
+import socket
 
 class Dialoghoster(QtWidgets.QDialog):
-    def __init__(self, conn=None, addr=None):
+    HEADER = 64
+
+    def __init__(self, conn: socket.socket, addr):
         super().__init__()
-        self.connection = conn, addr
+        self.conn = conn
+        self.addr = addr
         self.Dialog = QtWidgets.QDialog()
         self.verticalLayoutWidget = QtWidgets.QWidget(self.Dialog)
         self.l00 = QtWidgets.QLabel(self.Dialog)
@@ -28,11 +32,14 @@ class Dialoghoster(QtWidgets.QDialog):
         self.blanked = QtGui.QPixmap("pictures/blank.png")
         self.circle = QtGui.QPixmap("pictures/Kreis.png")
         self.X = QtGui.QPixmap("pictures/X.png")
-        self.playerTurn = False
+        self.playerTurn = True
+        self.elements_dict_str = {"00": self.l00, "01": self.l01, "02": self.l02, "10": self.l10, "11": self.l11, "12": self.l12, "20": self.l20, "21": self.l21, "22": self.l22}
+        self.elements_dict = {self.l00: "00", self.l01: "01", self.l02: "02", self.l10: "10", self.l11: "11", self.l12: "12", self.l20: "20", self.l21: "21", self.l22: "22"}
 
         self.setupUi()
         self.reset()
         self.Dialog.show()
+        Thread(target=self.recv, daemon=True).start()
 
     def setupUi(self):
         self.Dialog.setObjectName("Dialog")
@@ -73,6 +80,7 @@ class Dialoghoster(QtWidgets.QDialog):
         self.newGame.setGeometry(QtCore.QRect(10, 340, 75, 23))
         self.newGame.setObjectName("NewGamebttn")
         self.newGame.setText("New Game")
+        self.newGame.setAutoDefault(False)
         self.newGame.clicked.connect(self.newGameaction)
 
         for i in self.label_drawed.keys():
@@ -84,6 +92,44 @@ class Dialoghoster(QtWidgets.QDialog):
         self.Multiplayerlabel.setText("Multiplayer")
 
         QtCore.QMetaObject.connectSlotsByName(self.Dialog)
+
+    def _dc(self):
+        """Handels the clients disconnection"""
+        pass
+        # TODO Client disconnection
+
+    @classmethod
+    def _len_message(cls, msg):
+        """Internal Method used in send to pad messages"""
+        message = msg.encode()
+        send_length = str(len(message)).encode()
+        send_length += b' ' * (cls.HEADER - len(send_length))
+        return send_length
+
+    def send(self, msg):
+        """Send messages to the Client"""
+        send_length = Dialoghoster._len_message(msg)
+        self.conn.send(send_length)
+        print(msg)
+        print(type(self.conn))
+        print(type(self.addr))
+        self.conn.send(msg.encode())
+
+    def recv(self):  # recv messages
+        """Recieve the clients response"""
+        while True:
+            try:
+                msg_length = self.conn.recv(Dialoghoster.HEADER).decode()
+                if msg_length:
+                    msg = self.conn.recv(int(msg_length)).decode()
+                    if msg.startswith("!ACTIONDRAW-"):
+                        self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
+            except ConnectionError:
+                self.conn.close()
+                self._dc()
+                return
+            except Exception as e:
+                ui.write(f"Some not connection related Exception occured: {e}", color="red")
 
     @staticmethod
     def await_confirmation(msg):
@@ -118,7 +164,6 @@ class Dialoghoster(QtWidgets.QDialog):
         self.Chatplaintext.update()
 
     def lineeditpressed(self):
-        print("moin ich bins")
         text = self.Inputlineedit.text()
         self.Inputlineedit.clear()
         self.write(">>> " + text)
@@ -128,6 +173,7 @@ class Dialoghoster(QtWidgets.QDialog):
             if self.playerTurn:
                 if not self.label_drawed[source]:
                     self.draw(source, self.X)
+                    self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
                 else:
                     self.Outputlabel.setText("You can't override an already printed field")
             else:
