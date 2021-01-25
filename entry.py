@@ -3,7 +3,11 @@ import socket
 from playing import Dialogplaying
 from playinghost import Dialoghoster
 from time import sleep
+import requests
 
+
+r = requests.get(r'http://jsonip.com')
+ip = r.json()['ip']
 
 class WorkerThread(QtCore.QThread):
     signal = QtCore.pyqtSignal('PyQt_PyObject')
@@ -119,12 +123,12 @@ class Entry(object):
         text = self.inputip.text()
         self.inputip.clear()
         try:
-            ADDR = (socket.gethostbyname(socket.gethostname()), int(text))
+            ADDR = ("0.0.0.0", int(text))
         except Exception as e:
             self.connectionstatusbttn.setText(str(e))
             return
         if self.hosting[0]:
-            self.connectionstatusbttn.setText(f"Hoste Server auf {tuple(self.hosting[1])}")
+            self.connectionstatusbttn.setText(f"Hoste Server auf {ip, self.hosting[1][1]}")
             return
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -134,7 +138,7 @@ class Entry(object):
             self.connectionstatusbttn.setText(str(e))
             return
         else:
-            self.connectionstatusbttn.setText(f"Hoste Server auf {ADDR}")
+            self.connectionstatusbttn.setText(f"Hoste Server auf {ip, ADDR[1]}")
             self.hosting[0] = True
 
         self.threadHosting = WorkerThread(server)
@@ -172,7 +176,7 @@ class Entry(object):
         dialog.Dialog.exec_()
 
     def on_abort(self):
-        self.connecting = True
+        self.connecting = False
 
 
 if __name__ == "__main__":
@@ -181,3 +185,5 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     ui = Entry()
     sys.exit(app.exec_())
+
+# TODO manage draw - new Game bttn
