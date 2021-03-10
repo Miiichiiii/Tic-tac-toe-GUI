@@ -187,3 +187,4 @@ if __name__ == "__main__":
     sys.exit(app.exec_())
 
 # TODO manage draw - new Game bttn
+# TODO win counter
