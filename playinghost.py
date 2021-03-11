@@ -37,6 +37,7 @@ class Dialoghoster(QtWidgets.QDialog):
         self.elements_dict = {self.l00: "00", self.l01: "01", self.l02: "02", self.l10: "10", self.l11: "11", self.l12: "12", self.l20: "20", self.l21: "21", self.l22: "22"}
         self.playerOpponent_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
         self.playerOwn_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
+        self.gamedone = False
 
         self.setupUi()
         self.reset()
@@ -145,9 +146,11 @@ class Dialoghoster(QtWidgets.QDialog):
 
     def won(self):
         self.Outputlabel.setText("You have won")
+        self.gamedone = True
 
     def lost(self):
         self.Outputlabel.setText("You have lost")
+        self.gamedone = True
 
     @staticmethod
     def await_confirmation(msg):
@@ -198,6 +201,7 @@ class Dialoghoster(QtWidgets.QDialog):
         self.playerOpponent_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
         self.playerOwn_drawings = {"00": False, "01": False, "02": False, "10": False, "11": False, "12": False, "20": False, "21": False, "22": False}
         self.Outputlabel.setText("")
+        self.gamedone = False
 
     def write(self, text):
         """Used to give output to the Chat"""
@@ -213,31 +217,27 @@ class Dialoghoster(QtWidgets.QDialog):
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.MouseButtonDblClick:
-            if self.playerTurn:
-                if not self.label_drawed[source]:
-                    # TODO game finished
-                    self.draw(source, self.X)
-                    self.playerTurn = False
-                    self.label_drawed[source] = True
-                    self.playerOwn_drawings[self.elements_dict[source]] = True
-                    self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
-                    finished = self.is_game_finished()
-                    if finished[0]:
-                        if finished[1]:
-                            self.send("!FINISHED-LOST")
-                            self.won()
-                        else:
-                            self.send("!FINISHED-WON")
-                            self.lost()
+            if not self.gamedone:
+                if self.playerTurn:
+                    if not self.label_drawed[source]:
+                        # TODO game finished
+                        self.draw(source, self.X)
+                        self.playerTurn = False
+                        self.label_drawed[source] = True
+                        self.playerOwn_drawings[self.elements_dict[source]] = True
+                        self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
+                        finished = self.is_game_finished()
+                        if finished[0]:
+                            if finished[1]:
+                                self.send("!FINISHED-LOST")
+                                self.won()
+                            else:
+                                self.send("!FINISHED-WON")
+                                self.lost()
+                    else:
+                        self.Outputlabel.setText("You can't override an already printed field")
                 else:
-                    self.Outputlabel.setText("You can't override an already printed field")
+                    self.Outputlabel.setText("It's not your turn")
             else:
-                self.Outputlabel.setText("It's not your turn")
+                self.Outputlabel.setText("Game is already finished")
         return super(Dialoghoster, self).eventFilter(source, event)
-
-
-# if __name__ == "__main__":
-#     import sys
-#     app = QtWidgets.QApplication(sys.argv)
-#     ui = Dialoghoster()
-#     sys.exit(app.exec_())

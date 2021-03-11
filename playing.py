@@ -30,6 +30,7 @@ class Dialogplaying(QtWidgets.QDialog):
         self.circle = QtGui.QPixmap("pictures/Circle.png")
         self.X = QtGui.QPixmap("pictures/X.png")
         self.playerTurn = False
+        self.gamedone = False
 
         self.setupUi()
         self.reset()
@@ -117,9 +118,11 @@ class Dialogplaying(QtWidgets.QDialog):
 
     def won(self):
         self.Outputlabel.setText("You have won")
+        self.gamedone = True
 
     def lost(self):
         self.Outputlabel.setText("You have lost")
+        self.gamedone = True
 
     @staticmethod
     def draw(obj: QtWidgets.QLabel, picture: QtGui.QPixmap):
@@ -130,6 +133,7 @@ class Dialogplaying(QtWidgets.QDialog):
             i.setPixmap(self.blanked)
             self.label_drawed[i] = False
         self.Outputlabel.setText("")
+        self.gamedone = False
 
     def write(self, text):
         """Used to give output to the Chat"""
@@ -145,21 +149,17 @@ class Dialogplaying(QtWidgets.QDialog):
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.MouseButtonDblClick:
-            if self.playerTurn:
-                if not self.label_drawed[source]:
-                    self.draw(source, self.X)
-                    self.playerTurn = False
-                    self.label_drawed[source] = True
-                    self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
+            if not self.gamedone:
+                if self.playerTurn:
+                    if not self.label_drawed[source]:
+                        self.draw(source, self.X)
+                        self.playerTurn = False
+                        self.label_drawed[source] = True
+                        self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
+                    else:
+                        self.Outputlabel.setText("You can't override an already printed field")
                 else:
-                    self.Outputlabel.setText("You can't override an already printed field")
+                    self.Outputlabel.setText("It's not your turn")
             else:
-                self.Outputlabel.setText("It's not your turn")
+                self.Outputlabel.setText("Game is already finished")
         return super(Dialogplaying, self).eventFilter(source, event)
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    ui = Dialogplaying()
-    sys.exit(app.exec_())
