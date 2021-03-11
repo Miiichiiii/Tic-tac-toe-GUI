@@ -6,7 +6,7 @@ from time import sleep
 import requests
 
 
-r = requests.get(r'http://jsonip.com')
+r = requests.get(r'https://api.ipify.org/?format=json')
 ip = r.json()['ip']
 
 class WorkerThread(QtCore.QThread):
@@ -162,7 +162,6 @@ class Entry(object):
             return
         self.connecting = True
         if len(ADDR) == 2:
-            pass
             self.threadPlaying = WorkerThreadPlaying(ADDR, self)
             self.threadPlaying.start()
             self.threadPlaying.signal.connect(self.run_connected)
