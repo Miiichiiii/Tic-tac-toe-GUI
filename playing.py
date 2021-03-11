@@ -27,7 +27,7 @@ class Dialogplaying(QtWidgets.QDialog):
         self.Multiplayerlabel = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.Outputlabel = QtWidgets.QLabel(self.Dialog)
         self.blanked = QtGui.QPixmap("pictures/blank.png")
-        self.circle = QtGui.QPixmap("pictures/Kreis.png")
+        self.circle = QtGui.QPixmap("pictures/Circle.png")
         self.X = QtGui.QPixmap("pictures/X.png")
         self.playerTurn = False
 

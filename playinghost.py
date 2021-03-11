@@ -30,7 +30,7 @@ class Dialoghoster(QtWidgets.QDialog):
         self.Multiplayerlabel = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.Outputlabel = QtWidgets.QLabel(self.Dialog)
         self.blanked = QtGui.QPixmap("pictures/blank.png")
-        self.circle = QtGui.QPixmap("pictures/Kreis.png")
+        self.circle = QtGui.QPixmap("pictures/Circle.png")
         self.X = QtGui.QPixmap("pictures/X.png")
         self.playerTurn = True
         self.elements_dict_str = {"00": self.l00, "01": self.l01, "02": self.l02, "10": self.l10, "11": self.l11, "12": self.l12, "20": self.l20, "21": self.l21, "22": self.l22}

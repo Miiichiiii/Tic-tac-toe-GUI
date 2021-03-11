@@ -4,8 +4,10 @@ from playing import Dialogplaying
 from playinghost import Dialoghoster
 from time import sleep
 import requests
+import re
 
 
+ipaddress_pattern = re.compile(r"^(?:(?:^|\.)(?:2(?:5[0-5]|[0-4]\d)|1?\d?\d)){4}, (\d){,5}$")
 r = requests.get(r'https://api.ipify.org/?format=json')
 ip = r.json()['ip']
 
@@ -43,9 +45,6 @@ class WorkerThreadPlaying(QtCore.QThread):
                 self.instance.connectionstatusbttn.setText("Waiting for Connection")
             except TimeoutError:
                 self.instance.connectionstatusbttn.setText("Timeout Error - maybe change IP")
-            except Exception:
-                self.instance.connectionstatusbttn.setText("Input should be in format: IP, Port")
-                return
             else:
                 self.instance.connecting = False
                 self.signal.emit(client)
@@ -68,6 +67,8 @@ class Entry(object):
         self.Multiplayerlabel = QtWidgets.QLabel(self.centralwidget)
         self.newGame = QtWidgets.QPushButton(self.centralwidget)
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
+        self.threadPlaying = None
+        self.threadHosting = None
 
         self.hosting = [False, ["", 0]]
         self.connecting = False
@@ -110,13 +111,13 @@ class Entry(object):
 
     def retranslateUi(self):
         self.MainWindow.setWindowTitle("Tic Tac Toe")
-        self.newGame.setText("Neues Lokales Spiel")
-        self.Multiplayerlabel.setText("Multiplayer Spiel")
-        self.inputip.setToolTip("<html><head/><body><p>Hier IP und Port des gegenüber eingeben</p></body></html>")
+        self.newGame.setText("New local game")
+        self.Multiplayerlabel.setText("Multiplayer game")
+        self.inputip.setToolTip("<html><head/><body><p>IP and Port of the Opponent when connecting else only Port</p></body></html>")
         self.hostbttn.setText("Host")
         self.connectbttn.setText("Connect")
-        self.abortbttn.setText("Abbrechen")
-        self.connectionstatusbttn.setText("Warte auf Verbindung...")
+        self.abortbttn.setText("Abort")
+        self.connectionstatusbttn.setText("Waiting for connection...")
 
     def on_host_click(self):
         self.connecting = False
@@ -128,7 +129,7 @@ class Entry(object):
             self.connectionstatusbttn.setText(str(e))
             return
         if self.hosting[0]:
-            self.connectionstatusbttn.setText(f"Hoste Server auf {ip, self.hosting[1][1]}")
+            self.connectionstatusbttn.setText(f"Hosting server on {ip, self.hosting[1][1]}")
             return
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -138,7 +139,7 @@ class Entry(object):
             self.connectionstatusbttn.setText(str(e))
             return
         else:
-            self.connectionstatusbttn.setText(f"Hoste Server auf {ip, ADDR[1]}")
+            self.connectionstatusbttn.setText(f"Hosting server on {ip, ADDR[1]}")
             self.hosting[0] = True
 
         self.threadHosting = WorkerThread(server)
@@ -153,20 +154,16 @@ class Entry(object):
 
     def on_connect_click(self):
         text = self.inputip.text()
+        if not ipaddress_pattern.search(text):
+            self.connectionstatusbttn.setText("Input should be in format: <IP>, <Port>")
+            return
         self.inputip.clear()
         ADDR = text.replace(" ", "").split(",")
-        try:
-            ADDR = (ADDR[0], int(ADDR[1]))
-        except Exception:
-            self.connectionstatusbttn.setText("Input should be in format: IP, Port")
-            return
+        ADDR = (ADDR[0], int(ADDR[1]))
         self.connecting = True
-        if len(ADDR) == 2:
-            self.threadPlaying = WorkerThreadPlaying(ADDR, self)
-            self.threadPlaying.start()
-            self.threadPlaying.signal.connect(self.run_connected)
-        else:
-            self.connectionstatusbttn.setText("Input should be in format: IP, Port")
+        self.threadPlaying = WorkerThreadPlaying(ADDR, self)
+        self.threadPlaying.start()
+        self.threadPlaying.signal.connect(self.run_connected)
 
     @staticmethod
     def run_connected(client):
