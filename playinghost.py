@@ -220,7 +220,6 @@ class Dialoghoster(QtWidgets.QDialog):
             if not self.gamedone:
                 if self.playerTurn:
                     if not self.label_drawed[source]:
-                        # TODO game finished
                         self.draw(source, self.X)
                         self.playerTurn = False
                         self.label_drawed[source] = True
