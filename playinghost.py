@@ -3,6 +3,26 @@ from Confirmation_dialog import Confirmation
 from threading import Thread
 import socket
 
+class WorkerThread(QtCore.QThread):
+    signal = QtCore.pyqtSignal('PyQt_PyObject')
+
+    def __init__(self, instance):
+        QtCore.QThread.__init__(self)
+        self.instance = instance
+
+    def run(self):
+        while True:
+            try:
+                msg_length = self.instance.conn.recv(Dialoghoster.HEADER).decode()
+                if msg_length:
+                    self.signal.emit(self.instance.conn.recv(int(msg_length)).decode())
+            except ConnectionError:
+                self.instance.conn.close()
+                self.instance._dc()
+                return
+            except Exception as e:
+                self.instance.Outputlabel.setText(f"Some not connection related Exception occured: {str(e)}")
+
 class Dialoghoster(QtWidgets.QDialog):
     HEADER = 64
 
@@ -42,7 +62,9 @@ class Dialoghoster(QtWidgets.QDialog):
         self.setupUi()
         self.reset()
         self.Dialog.show()
-        Thread(target=self.recv, daemon=True).start()
+        self.thread = WorkerThread(self)
+        self.thread.start()
+        self.thread.signal.connect(self.recv)
 
     def setupUi(self):
         self.Dialog.setObjectName("Dialog")
@@ -115,34 +137,23 @@ class Dialoghoster(QtWidgets.QDialog):
         self.conn.send(send_length)
         self.conn.send(msg.encode())
 
-    def recv(self):  # recv messages
+    def recv(self, msg):  # recv messages
         """Recieve the clients response"""
-        while True:
-            try:
-                msg_length = self.conn.recv(Dialoghoster.HEADER).decode()
-                if msg_length:
-                    msg = self.conn.recv(int(msg_length)).decode()
-                    if msg.startswith("!ACTIONDRAW-"):
-                        self.playerTurn = True
-                        self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
-                        self.playerOpponent_drawings[msg.split("-")[1]] = True
-                        self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
-                        finished = self.is_game_finished()
-                        if finished[0]:
-                            if finished[1]:
-                                self.send("!FINISHED-LOST")
-                                self.won()
-                            else:
-                                self.send("!FINISHED-WON")
-                                self.lost()
-                    elif msg.startswith("!MSG-"):
-                        self.write(msg.split("-")[1])
-            except ConnectionError:
-                self.conn.close()
-                self._dc()
-                return
-            except Exception as e:
-                self.Outputlabel.setText(f"Some not connection related Exception occured: {str(e)}")
+        if msg.startswith("!ACTIONDRAW-"):
+            self.playerTurn = True
+            self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
+            self.playerOpponent_drawings[msg.split("-")[1]] = True
+            self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
+            finished = self.is_game_finished()
+            if finished[0]:
+                if finished[1]:
+                    self.send("!FINISHED-LOST")
+                    self.won()
+                else:
+                    self.send("!FINISHED-WON")
+                    self.lost()
+        elif msg.startswith("!MSG-"):
+            self.write(msg.split("-")[1])
 
     def won(self):
         self.Outputlabel.setText("You have won")

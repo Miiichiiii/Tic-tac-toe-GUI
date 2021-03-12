@@ -1,6 +1,17 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-from threading import Thread
 
+class WorkerThread(QtCore.QThread):
+    signal = QtCore.pyqtSignal('PyQt_PyObject')
+
+    def __init__(self, instance):
+        QtCore.QThread.__init__(self)
+        self.instance = instance
+
+    def run(self):
+        while True:
+            send_length = self.instance.client.recv(Dialogplaying.HEADER).decode()
+            if send_length:
+                self.signal.emit(self.instance.client.recv(int(send_length)).decode())
 
 class Dialogplaying(QtWidgets.QDialog):
     HEADER = 64
@@ -37,7 +48,9 @@ class Dialogplaying(QtWidgets.QDialog):
         self.Dialog.show()
         self.elements_dict_str = {"00": self.l00, "01": self.l01, "02": self.l02, "10": self.l10, "11": self.l11, "12": self.l12, "20": self.l20, "21": self.l21, "22": self.l22}
         self.elements_dict = {self.l00: "00", self.l01: "01", self.l02: "02", self.l10: "10", self.l11: "11", self.l12: "12", self.l20: "20", self.l21: "21", self.l22: "22"}
-        Thread(target=self.recv, daemon=True).start()
+        self.thread = WorkerThread(self)
+        self.thread.start()
+        self.thread.signal.connect(self.recv)
 
     def setupUi(self):
         self.Dialog.setObjectName("Dialog")
@@ -97,24 +110,20 @@ class Dialogplaying(QtWidgets.QDialog):
         self.client.send(self._get_size(msg))
         self.client.send(msg.encode())
 
-    def recv(self):
-        while True:
-            send_length = self.client.recv(Dialogplaying.HEADER).decode()
-            if send_length:
-                msg = self.client.recv(int(send_length)).decode()
-                if msg.startswith("!ACTIONDRAW-"):
-                    self.playerTurn = True
-                    self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
-                    self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
-                elif msg.startswith("!MSG-"):
-                    self.write(msg.split("-")[1])
-                elif msg.startswith("!FINISHED-"):
-                    if msg.split("-")[1] == "WON":
-                        self.won()
-                    else:
-                        self.lost()
-                elif msg.startswith("!NEWGAME"):
-                    self.reset()
+    def recv(self, msg):
+        if msg.startswith("!ACTIONDRAW-"):
+            self.playerTurn = True
+            self.draw(self.elements_dict_str[(msg.split("-")[1])], self.circle)
+            self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
+        elif msg.startswith("!MSG-"):
+            self.write(msg.split("-")[1])
+        elif msg.startswith("!FINISHED-"):
+            if msg.split("-")[1] == "WON":
+                self.won()
+            else:
+                self.lost()
+        elif msg.startswith("!NEWGAME"):
+            self.reset()
 
     def won(self):
         self.Outputlabel.setText("You have won")
