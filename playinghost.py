@@ -1,7 +1,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 from Confirmation_dialog import Confirmation
-from threading import Thread
 import socket
+from enum import Enum
 
 class WorkerThread(QtCore.QThread):
     signal = QtCore.pyqtSignal('PyQt_PyObject')
@@ -18,10 +18,13 @@ class WorkerThread(QtCore.QThread):
                     self.signal.emit(self.instance.conn.recv(int(msg_length)).decode())
             except ConnectionError:
                 self.instance.conn.close()
-                self.instance._dc()
+                self.instance.dc()
                 return
             except Exception as e:
                 self.instance.Outputlabel.setText(f"Some not connection related Exception occured: {str(e)}")
+
+class GameStatus(Enum):
+    Loose, Draw, Win = range(3)
 
 class Dialoghoster(QtWidgets.QDialog):
     HEADER = 64
@@ -118,7 +121,7 @@ class Dialoghoster(QtWidgets.QDialog):
 
         QtCore.QMetaObject.connectSlotsByName(self.Dialog)
 
-    def _dc(self):
+    def dc(self):
         """Handels the clients disconnection"""
         pass
         # TODO Client disconnection
@@ -146,12 +149,15 @@ class Dialoghoster(QtWidgets.QDialog):
             self.label_drawed[self.elements_dict_str[(msg.split("-")[1])]] = True
             finished = self.is_game_finished()
             if finished[0]:
-                if finished[1]:
+                if finished[1] == GameStatus.Loose:
                     self.send("!FINISHED-LOST")
                     self.won()
-                else:
+                elif finished[1] == GameStatus.Win:
                     self.send("!FINISHED-WON")
                     self.lost()
+                else:
+                    self.send("!FINISHED-DRAW")
+                    self.draw_()
         elif msg.startswith("!MSG-"):
             self.write(msg.split("-")[1])
 
@@ -163,6 +169,10 @@ class Dialoghoster(QtWidgets.QDialog):
         self.Outputlabel.setText("You have lost")
         self.gamedone = True
 
+    def draw_(self):
+        self.Outputlabel.setText("Draw!")
+        self.gamedone = True
+
     @staticmethod
     def await_confirmation(msg):
         confirmation_box = Confirmation(msg)
@@ -172,7 +182,7 @@ class Dialoghoster(QtWidgets.QDialog):
             return False
 
     def is_game_finished(self):
-        d = {0: True, 1: False}
+        d = {0: GameStatus.Loose, 1: GameStatus.Win}
         for e, u in enumerate([self.playerOwn_drawings, self.playerOpponent_drawings]):
             if all([u["00"], u["10"], u["20"]]):
                 return True, d[e]
@@ -190,6 +200,8 @@ class Dialoghoster(QtWidgets.QDialog):
                 return True, d[e]
             elif all([u["20"], u["11"], u["02"]]):
                 return True, d[e]
+        if all([x or y for x, y in zip(self.playerOpponent_drawings.values(), self.playerOwn_drawings.values())]):
+            return True, GameStatus.Draw
         return False, False
 
     def newGameaction(self):
@@ -238,12 +250,15 @@ class Dialoghoster(QtWidgets.QDialog):
                         self.send(f"!ACTIONDRAW-{self.elements_dict[source]}")
                         finished = self.is_game_finished()
                         if finished[0]:
-                            if finished[1]:
+                            if finished[1] == GameStatus.Loose:
                                 self.send("!FINISHED-LOST")
                                 self.won()
-                            else:
+                            elif finished[1] == GameStatus.Win:
                                 self.send("!FINISHED-WON")
                                 self.lost()
+                            elif finished[1] == GameStatus.Draw:
+                                self.send("!FINISHED-DRAW")
+                                self.draw_()
                     else:
                         self.Outputlabel.setText("You can't override an already printed field")
                 else:

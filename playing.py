@@ -120,8 +120,10 @@ class Dialogplaying(QtWidgets.QDialog):
         elif msg.startswith("!FINISHED-"):
             if msg.split("-")[1] == "WON":
                 self.won()
-            else:
+            elif msg.split("-")[1] == "LOST":
                 self.lost()
+            elif msg.split("-")[1] == "DRAW":
+                self.draw_()
         elif msg.startswith("!NEWGAME"):
             self.reset()
 
@@ -131,6 +133,10 @@ class Dialogplaying(QtWidgets.QDialog):
 
     def lost(self):
         self.Outputlabel.setText("You have lost")
+        self.gamedone = True
+
+    def draw_(self):
+        self.Outputlabel.setText("Draw!")
         self.gamedone = True
 
     @staticmethod
