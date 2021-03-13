@@ -139,9 +139,9 @@ class Dialogplaying(QtWidgets.QDialog):
         self.Outputlabel.setText("Draw!")
         self.gamedone = True
 
-    @staticmethod
-    def draw(obj: QtWidgets.QLabel, picture: QtGui.QPixmap):
+    def draw(self, obj: QtWidgets.QLabel, picture: QtGui.QPixmap):
         obj.setPixmap(picture)
+        self.Outputlabel.setText("")
 
     def reset(self):
         for i in self.label_drawed.keys():
