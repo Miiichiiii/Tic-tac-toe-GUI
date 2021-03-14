@@ -159,8 +159,9 @@ class Dialogplaying(QtWidgets.QDialog):
     def lineeditpressed(self):
         text = self.Inputlineedit.text()
         self.Inputlineedit.clear()
-        self.write(">>> " + text)
-        self.send(f"!MSG-{text}")
+        if text.replace(" ", ""):
+            self.write(">>> " + text)
+            self.send(f"!MSG-{text}")
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.MouseButtonDblClick:
